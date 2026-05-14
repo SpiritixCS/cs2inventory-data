@@ -1,0 +1,39 @@
+name: Fetch Skinport snapshot
+
+# Runs hourly at :07 past the hour (avoids the top-of-hour rush on GitHub's runner pool)
+# Can also be triggered manually from the Actions tab.
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+# The workflow needs write access to push the updated JSON back to the repo
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch Skinport prices
+        run: node fetch-skinport.mjs
+
+      - name: Commit updated snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add skinport-cs2.json
+          if git diff --staged --quiet; then
+            echo "No price changes — skipping commit."
+          else
+            git commit -m "snapshot $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
