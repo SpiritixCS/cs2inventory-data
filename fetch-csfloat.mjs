@@ -41,17 +41,30 @@ const names = skinportData.items
 console.log(`  ${names.length} items above €${MIN_PRICE}`);
 
 // ── 3. Query CSFloat per item ─────────────────────────────────────────────
+let _debugCount = 0;
 async function fetchLowestAsk(marketHashName) {
   const encoded = encodeURIComponent(marketHashName);
   const url = `https://csfloat.com/api/v1/listings?market_hash_name=${encoded}&sort_by=lowest_price&type=buy_now&limit=1`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const bodyText = await res.text();
+    if (_debugCount < 3) {
+      _debugCount++;
+      console.log(`[DEBUG #${_debugCount}] ${marketHashName}`);
+      console.log(`  status: ${res.status}`);
+      console.log(`  body: ${bodyText.slice(0, 500)}`);
+    }
     if (!res.ok) return null;
-    const body = await res.json();
+    let body;
+    try { body = JSON.parse(bodyText); } catch { return null; }
     const arr = Array.isArray(body.data) ? body.data : (Array.isArray(body) ? body : []);
     if (!arr.length) return null;
     return arr[0].price; // USD cents
-  } catch {
+  } catch (e) {
+    if (_debugCount < 3) {
+      _debugCount++;
+      console.log(`[DEBUG #${_debugCount}] ${marketHashName} — EXCEPTION: ${e.message}`);
+    }
     return null;
   }
 }
