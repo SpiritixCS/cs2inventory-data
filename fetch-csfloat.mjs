@@ -16,6 +16,13 @@ const BATCH_DELAY  = 600;   // ms between batches
 const MIN_PRICE    = 1.00;  // skip items cheaper than €1 (stickers, keys, etc.)
 const MIN_ITEMS    = 100;   // abort if fewer than this many items priced (signals outage)
 
+const API_KEY = process.env.CSFLOAT_API_KEY;
+if (!API_KEY) {
+  console.error('✗ CSFLOAT_API_KEY environment variable is not set');
+  process.exit(1);
+}
+const AUTH_HEADERS = { 'Authorization': API_KEY };
+
 // ── 1. Exchange rate ───────────────────────────────────────────────────────
 console.log('Fetching EUR/USD exchange rate…');
 const rateRes = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR');
@@ -41,30 +48,17 @@ const names = skinportData.items
 console.log(`  ${names.length} items above €${MIN_PRICE}`);
 
 // ── 3. Query CSFloat per item ─────────────────────────────────────────────
-let _debugCount = 0;
 async function fetchLowestAsk(marketHashName) {
   const encoded = encodeURIComponent(marketHashName);
   const url = `https://csfloat.com/api/v1/listings?market_hash_name=${encoded}&sort_by=lowest_price&type=buy_now&limit=1`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    const bodyText = await res.text();
-    if (_debugCount < 3) {
-      _debugCount++;
-      console.log(`[DEBUG #${_debugCount}] ${marketHashName}`);
-      console.log(`  status: ${res.status}`);
-      console.log(`  body: ${bodyText.slice(0, 500)}`);
-    }
+    const res = await fetch(url, { headers: AUTH_HEADERS, signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return null;
-    let body;
-    try { body = JSON.parse(bodyText); } catch { return null; }
+    const body = await res.json();
     const arr = Array.isArray(body.data) ? body.data : (Array.isArray(body) ? body : []);
     if (!arr.length) return null;
     return arr[0].price; // USD cents
-  } catch (e) {
-    if (_debugCount < 3) {
-      _debugCount++;
-      console.log(`[DEBUG #${_debugCount}] ${marketHashName} — EXCEPTION: ${e.message}`);
-    }
+  } catch {
     return null;
   }
 }

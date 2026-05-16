@@ -25,6 +25,8 @@ jobs:
 
       - name: Fetch CSFloat prices
         run: node fetch-csfloat.mjs
+        env:
+          CSFLOAT_API_KEY: ${{ secrets.CSFLOAT_API_KEY }}
 
       - name: Commit updated snapshot
         run: |
